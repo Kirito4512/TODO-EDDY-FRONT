@@ -289,14 +289,23 @@ body {
   color: var(--text-muted);
 }
 
-/* TEXTAREA REDUCIDO - ARREGLADO */
+/* TEXTAREA CON ALTURA IGUAL A BOTONES - CORREGIDO */
 .textarea-field {
-  min-height: 80px; /* Reducido de 120px */
-  max-height: 150px; /* Límite máximo */
-  resize: vertical;
+  min-height: 46px; /* Misma altura que inputs y botones */
+  max-height: 46px; /* Forzar misma altura */
+  resize: none; /* Deshabilitar redimensionado */
   font-family: inherit;
-  padding: 0.875rem 1.25rem; /* Igual que input-field */
+  padding: 0.875rem 1.25rem;
   line-height: 1.4;
+  overflow-y: hidden; /* Ocultar scroll vertical */
+  transition: var(--transition);
+}
+
+/* Para edición, permitir más altura */
+.edit-form .textarea-field {
+  min-height: 100px;
+  max-height: 200px;
+  resize: vertical;
   overflow-y: auto;
 }
 
@@ -304,6 +313,10 @@ body {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.textarea-field::placeholder {
+  color: var(--text-muted);
 }
 
 .select-field {
@@ -344,7 +357,26 @@ body {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr auto;
   gap: 1.5rem;
-  align-items: end;
+  align-items: stretch; /* Forzar alineación vertical */
+}
+
+/* Asegurar que todos los elementos tengan misma altura */
+.create-form .input-group,
+.create-form .btn {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Textarea group con altura específica */
+.create-form .textarea-group {
+  height: 100%;
+}
+
+.create-form .textarea-group .textarea-field {
+  flex: 1; /* Ocupar todo el espacio disponible */
+  min-height: 46px;
+  height: 100%;
 }
 
 @media (max-width: 1024px) {
@@ -376,7 +408,7 @@ body {
 }
 
 /* ============================================
-   SECCIÓN CONTROLES - CORREGIDO (ICONO BÚSQUEDA)
+   SECCIÓN CONTROLES - CON ESPACIO DESPUÉS
    ============================================ */
 .controls-section {
   margin-top: 0.5rem;
@@ -389,6 +421,7 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 1.5rem;
+  margin-bottom: 1.5rem; /* ESPACIO AÑADIDO después del buscador */
 }
 
 .search-container {
@@ -398,10 +431,10 @@ body {
   min-width: 250px;
 }
 
-/* INPUT DE BÚSQUEDA - ARREGLADO */
+/* INPUT DE BÚSQUEDA */
 .search-input {
   width: 100%;
-  padding: 0.875rem 1.25rem 0.875rem 3rem; /* Más padding a la izquierda para el icono */
+  padding: 0.875rem 1.25rem 0.875rem 3rem;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
@@ -421,7 +454,7 @@ body {
   color: var(--text-muted);
 }
 
-/* ICONO DE BÚSQUEDA - ARREGLADO */
+/* ICONO DE BÚSQUEDA */
 .search-icon {
   position: absolute;
   left: 1rem;
@@ -433,11 +466,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none; /* No interfiere con el input */
+  pointer-events: none;
   z-index: 2;
 }
 
-/* Icono SVG para búsqueda */
 .search-icon svg {
   width: 100%;
   height: 100%;
@@ -475,10 +507,10 @@ body {
 }
 
 /* ============================================
-   LISTA DE TAREAS
+   LISTA DE TAREAS - CON MÁRGEN SUPERIOR
    ============================================ */
 .tasks-section {
-  margin-top: 0;
+  margin-top: 0.5rem; /* Espacio después del buscador */
   margin-bottom: 2rem;
   flex: 1;
   padding: 0 0.5rem;
@@ -674,7 +706,7 @@ body {
 
 .edit-form .textarea-field {
   grid-column: 1 / -1;
-  min-height: 100px; /* Un poco más alto en edición */
+  min-height: 100px;
 }
 
 .edit-actions {
@@ -916,6 +948,10 @@ body {
   .task-item {
     padding: 1.5rem;
   }
+  
+  .controls-section {
+    margin-bottom: 1.25rem;
+  }
 }
 
 @media (max-width: 768px) {
@@ -958,6 +994,7 @@ body {
   .controls-section {
     padding: 1rem;
     flex-direction: column;
+    margin-bottom: 1rem;
   }
   
   .search-container {
@@ -966,7 +1003,7 @@ body {
   }
   
   .search-input {
-    padding-left: 2.75rem; /* Ajustado para móvil */
+    padding-left: 2.75rem;
   }
   
   .task-header {
@@ -993,6 +1030,10 @@ body {
     padding: 1.25rem;
   }
   
+  .tasks-section {
+    margin-top: 0.25rem;
+  }
+  
   .edit-panel {
     padding: 1.5rem;
   }
@@ -1002,7 +1043,8 @@ body {
   }
   
   .textarea-field {
-    min-height: 70px; /* Un poco más pequeño en móvil */
+    min-height: 46px;
+    max-height: 46px;
   }
 }
 
@@ -1034,7 +1076,7 @@ body {
   }
   
   .search-input {
-    padding-left: 2.5rem; /* Ajustado para pantallas muy pequeñas */
+    padding-left: 2.5rem;
   }
   
   .search-icon {
@@ -1063,7 +1105,8 @@ body {
   }
   
   .textarea-field {
-    min-height: 60px; /* Mínimo para móvil */
+    min-height: 46px;
+    max-height: 46px;
   }
 }
 
@@ -1189,4 +1232,47 @@ body {
 
 ::-ms-input-placeholder {
   color: var(--text-muted);
+}
+
+/* ============================================
+   CLASES ESPECÍFICAS PARA FORMULARIO DE CREACIÓN
+   ============================================ */
+.create-form-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr auto;
+  gap: 1.5rem;
+  align-items: end;
+}
+
+.create-form-grid .input-group {
+  margin: 0;
+}
+
+/* Asegurar altura consistente en formulario de creación */
+.create-form .input-field,
+.create-form .select-field,
+.create-form .textarea-field,
+.create-form .btn {
+  height: 46px;
+  min-height: 46px;
+}
+
+/* Textarea específico para creación */
+.create-form .textarea-field {
+  height: 46px;
+  line-height: 1.4;
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+}
+
+/* Clase para grupo de textarea con altura fija */
+.textarea-wrapper {
+  height: 46px;
+  display: flex;
+  flex-direction: column;
+}
+
+.textarea-wrapper .textarea-field {
+  flex: 1;
+  height: 100%;
 }
