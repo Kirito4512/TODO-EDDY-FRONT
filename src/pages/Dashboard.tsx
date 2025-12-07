@@ -236,11 +236,6 @@ export default function Dashboard() {
     }
   }
 
-  function toggleTask(task: Task) {
-    const newStatus =
-      task.status === "Completada" ? "Pendiente" : "Completada";
-    changeStatus(task, newStatus);
-  }
 
   // START EDIT
   function startEdit(task: Task) {
