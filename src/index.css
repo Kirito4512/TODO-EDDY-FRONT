@@ -51,7 +51,6 @@ body {
    AJUSTES DE TAMAÑO DE CONTENEDORES
    ============================================ */
 
-/* Ajuste principal del wrap para mejor uso del espacio */
 .wrap {
   max-width: 1200px;
   margin: 0 auto;
@@ -62,7 +61,6 @@ body {
   gap: 1.5rem;
 }
 
-/* Ajuste del topbar container */
 .topbar-container {
   display: flex;
   align-items: center;
@@ -106,7 +104,6 @@ body {
   letter-spacing: -0.025em;
 }
 
-/* Mejor distribución de las estadísticas */
 .stats {
   display: flex;
   gap: 1.5rem;
@@ -256,7 +253,7 @@ body {
 }
 
 /* ============================================
-   FORMULARIOS Y ENTRADAS
+   FORMULARIOS Y ENTRADAS - CORREGIDO
    ============================================ */
 .input-group {
   display: flex;
@@ -270,7 +267,7 @@ body {
   color: var(--text-primary);
 }
 
-.input-field, .search-input {
+.input-field {
   padding: 0.875rem 1.25rem;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid var(--card-border);
@@ -282,21 +279,31 @@ body {
   min-height: 46px;
 }
 
-.input-field:focus, .search-input:focus {
+.input-field:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-.input-field::placeholder, .search-input::placeholder {
+.input-field::placeholder {
   color: var(--text-muted);
 }
 
+/* TEXTAREA REDUCIDO - ARREGLADO */
 .textarea-field {
-  min-height: 120px;
+  min-height: 80px; /* Reducido de 120px */
+  max-height: 150px; /* Límite máximo */
   resize: vertical;
   font-family: inherit;
-  padding: 1rem 1.25rem;
+  padding: 0.875rem 1.25rem; /* Igual que input-field */
+  line-height: 1.4;
+  overflow-y: auto;
+}
+
+.textarea-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 .select-field {
@@ -322,7 +329,7 @@ body {
 }
 
 /* ============================================
-   SECCIÓN CREAR TAREA
+   SECCIÓN CREAR TAREA - CORREGIDO
    ============================================ */
 .create-section {
   margin-top: 1rem;
@@ -369,7 +376,7 @@ body {
 }
 
 /* ============================================
-   SECCIÓN CONTROLES
+   SECCIÓN CONTROLES - CORREGIDO (ICONO BÚSQUEDA)
    ============================================ */
 .controls-section {
   margin-top: 0.5rem;
@@ -391,18 +398,50 @@ body {
   min-width: 250px;
 }
 
+/* INPUT DE BÚSQUEDA - ARREGLADO */
+.search-input {
+  width: 100%;
+  padding: 0.875rem 1.25rem 0.875rem 3rem; /* Más padding a la izquierda para el icono */
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: var(--transition);
+  min-height: 46px;
+}
+
 .search-input:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ICONO DE BÚSQUEDA - ARREGLADO */
 .search-icon {
   position: absolute;
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* No interfiere con el input */
+  z-index: 2;
+}
+
+/* Icono SVG para búsqueda */
+.search-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
 
 .filter-buttons {
@@ -635,6 +674,7 @@ body {
 
 .edit-form .textarea-field {
   grid-column: 1 / -1;
+  min-height: 100px; /* Un poco más alto en edición */
 }
 
 .edit-actions {
@@ -925,6 +965,10 @@ body {
     min-width: auto;
   }
   
+  .search-input {
+    padding-left: 2.75rem; /* Ajustado para móvil */
+  }
+  
   .task-header {
     flex-direction: column;
     align-items: stretch;
@@ -956,6 +1000,10 @@ body {
   .auth-card {
     padding: 2rem;
   }
+  
+  .textarea-field {
+    min-height: 70px; /* Un poco más pequeño en móvil */
+  }
 }
 
 @media (max-width: 480px) {
@@ -985,6 +1033,14 @@ body {
     flex-direction: column;
   }
   
+  .search-input {
+    padding-left: 2.5rem; /* Ajustado para pantallas muy pequeñas */
+  }
+  
+  .search-icon {
+    left: 0.875rem;
+  }
+  
   .task-item {
     padding: 1rem;
   }
@@ -1004,6 +1060,10 @@ body {
   
   .auth-card {
     padding: 1.5rem;
+  }
+  
+  .textarea-field {
+    min-height: 60px; /* Mínimo para móvil */
   }
 }
 
@@ -1084,4 +1144,49 @@ body {
 
 .w-full {
   width: 100%;
+}
+
+/* ============================================
+   ESTILO PARA CHECKBOX Y ELEMENTOS DE FORMULARIO
+   ============================================ */
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-input {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--card-border);
+  background: rgba(15, 23, 42, 0.7);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.checkbox-input:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.checkbox-label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Estilo para placeholders */
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+:-ms-input-placeholder {
+  color: var(--text-muted);
+}
+
+::-ms-input-placeholder {
+  color: var(--text-muted);
 }
