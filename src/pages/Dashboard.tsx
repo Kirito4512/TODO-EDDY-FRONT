@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiLogOut } from "react-icons/fi";
+import { FiLogOut, FiSearch, FiPlus, FiCheck, FiClock, FiPlay, FiEdit2, FiTrash2, FiSave, FiX, FiCloud, FiCloudOff } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { api, setAuth } from "../api";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { toast } from "react-toastify";
+
 import {
   cacheTasks,
   getAllTasksLocal,
@@ -16,7 +18,7 @@ import {
 type Task = {
   _id: string;
   title: string;
-  descrption?: string; // keep the same misspelling to match your DB
+  description?: string;
   status: "Pendiente" | "En Progreso" | "Completada";
   clienteId?: string;
   createdAt?: string;
@@ -27,7 +29,7 @@ function normalizeTask(x: any): Task {
   return {
     _id: String(x?._id ?? x?.id),
     title: String(x?.title ?? "(sin título)"),
-    descrption: x?.descrption ?? "",
+    description: x?.description ?? "",
     status:
       x?.status === "Completada" ||
       x?.status === "En Progreso" ||
@@ -41,11 +43,19 @@ function normalizeTask(x: any): Task {
 }
 
 function isSyncPending(id: string): boolean {
-    // Los IDs de MongoDB suelen ser de 24 caracteres hexadecimales.
-    // Los IDs temporales (UUIDs) son de 36 caracteres.
-    return id.length > 30; 
+  return id.length > 30;
 }
 
+function formatDate(dateString?: string): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -56,10 +66,6 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
 
-  // UI states
-  const [showSearch, setShowSearch] = useState(false);
-
-  // editing inline states
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDesc, setEditingDesc] = useState("");
@@ -69,142 +75,130 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-  setAuth(localStorage.getItem("token"));
-  loadTasks();
-  
-  // 🎯 NUEVA LÓGICA: Escuchar el evento personalizado de sincronización
-  window.addEventListener("sync-complete", loadTasks);
-  
-  return () => {
-    window.removeEventListener("sync-complete", loadTasks);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+    setAuth(localStorage.getItem("token"));
+    loadTasks();
 
- async function loadTasks() {
+    const handler = () => {
+      toast.success("Sincronización completada");
+      loadTasks();
+    };
+
+    window.addEventListener("sync-complete", handler);
+
+    return () => {
+      window.removeEventListener("sync-complete", handler);
+    };
+  }, []);
+
+  async function loadTasks() {
     setLoading(true);
     try {
-        if (navigator.onLine) {
-            // 🚨 Nuevo: Intentamos obtener del servidor
-            try { 
-                const { data } = await api.get("/tasks");
-                
-                const raw = Array.isArray(data?.items)
-                    ? data.items
-                    : Array.isArray(data)
-                    ? data
-                    : [];
-                
-                const list = raw.map(normalizeTask);
-                setTasks(list);
-                await cacheTasks(list);
+      if (navigator.onLine) {
+        try {
+          const { data } = await api.get("/tasks");
 
-            } catch (err) {
-                // 🚨 Fallback: Si el servidor falla, cargamos desde la caché local 
-                // para evitar mostrar una lista vacía.
-                console.warn("Fallo al obtener tareas del servidor, cargando desde caché local.", err);
-                const cached = await getAllTasksLocal();
-                setTasks(cached);
-            }
-        } else {
-            // Modo OFFLINE: siempre carga desde caché
-            const cached = await getAllTasksLocal();
-            setTasks(cached);
+          const raw = Array.isArray(data?.items)
+            ? data.items
+            : Array.isArray(data)
+            ? data
+            : [];
+
+          const list = raw.map(normalizeTask);
+          setTasks(list);
+          await cacheTasks(list);
+        } catch (err) {
+          console.warn("Server error, loading cache", err);
+          toast.error("No se pudo conectar al servidor, usando modo offline");
+          const cached = await getAllTasksLocal();
+          setTasks(cached);
         }
+      } else {
+        const cached = await getAllTasksLocal();
+        setTasks(cached);
+      }
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-}
-  
+  }
 
-  
+  // ADD TASK
+  async function addTask(e: React.FormEvent) {
+    e.preventDefault();
+    const t = title.trim();
+    if (!t) return;
 
-  
+    const clienteId = crypto.randomUUID();
+    const newTask: Task = {
+      _id: clienteId,
+      title: t,
+      description: desc.trim() || "",
+      status: statusNew,
+      clienteId,
+      createdAt: new Date().toISOString(),
+    };
 
-  // add
-  async function addTask(e: React.FormEvent) {
-    e.preventDefault();
-    const t = title.trim();
-    if (!t) return;
+    setTasks((prev) => [newTask, ...prev]);
+    await putTaskLocal(newTask);
 
-    const clienteId = crypto.randomUUID();
-    const newTask: Task = {
-      _id: clienteId, // Usa clienteId temporalmente
-      title: t,
-      descrption: desc.trim() || "",
-      status: statusNew,
-      clienteId,
-      createdAt: new Date().toISOString(),
-    };
+    setTitle("");
+    setDesc("");
+    setStatusNew("Pendiente");
 
-    // Mostrar inmediatamente y guardar en caché local (con clienteId)
-    setTasks((prev) => [newTask, ...prev]);
-    await putTaskLocal(newTask);
-    setTitle("");
-    setDesc("");
-    setStatusNew("Pendiente");
+    toast.success("Tarea creada exitosamente");
 
-    if (navigator.onLine) {
-      try {
-        // 1. Enviar al servidor
-        const { data } = await api.post("/tasks", {
-          title: newTask.title,
-          descrption: newTask.descrption,
-          status: newTask.status,
-        });
-        const serverTask = normalizeTask(data?.task ?? data);
-        const serverId = serverTask._id;
-        
-        // 2. Guardar mapeo (clienteId -> serverId)
-        await setMapping(clienteId, serverId);
-        
-        // 3. Reemplazar en la UI:
-        setTasks((prev) => {
-            const listWithoutTemp = prev.filter((t) => t._id !== clienteId);
-            // Reinsertar la tarea permanente al inicio
-            return [serverTask, ...listWithoutTemp]; 
+    if (navigator.onLine) {
+      try {
+        const { data } = await api.post("/tasks", {
+          title: newTask.title,
+          description: newTask.description,
+          status: newTask.status,
         });
-        
-        // 4. Reemplazar en la caché local:
-        await removeTaskLocal(clienteId);
-        await putTaskLocal(serverTask);
 
+        const serverTask = normalizeTask(data?.task ?? data);
+        const serverId = serverTask._id;
 
-      } catch (err) {
-        console.warn("POST error, queueing", err);
-        // Si falla el POST (ej. error 500, servidor caído), la tarea se encola
-        await queue({
-          _id: crypto.randomUUID(),
-          op: "create",
-          clienteId,
-          data: newTask,
-          ts: Date.now(),
-        });
-      }
-    } else {
-      // 5. Si está offline, solo se encola
-      await queue({
-        _id: crypto.randomUUID(),
-        op: "create",
-        clienteId,
-        data: newTask,
-        ts: Date.now(),
-      });
-    }
-  }
+        await setMapping(clienteId, serverId);
 
-  // safe change status -> importante: si no hay mapping hacemos queue
+        setTasks((prev) => {
+          const filtered = prev.filter((x) => x._id !== clienteId);
+          return [serverTask, ...filtered];
+        });
+
+        await removeTaskLocal(clienteId);
+        await putTaskLocal(serverTask);
+      } catch (err) {
+        await queue({
+          _id: crypto.randomUUID(),
+          op: "create",
+          clienteId,
+          data: newTask,
+          ts: Date.now(),
+        });
+      }
+    } else {
+      await queue({
+        _id: crypto.randomUUID(),
+        op: "create",
+        clienteId,
+        data: newTask,
+        ts: Date.now(),
+      });
+    }
+  }
+
+  // CHANGE STATUS
   async function changeStatus(task: Task, newStatus: Task["status"]) {
     const updated = { ...task, status: newStatus };
+
     setTasks((prev) => prev.map((x) => (x._id === task._id ? updated : x)));
     await putTaskLocal(updated);
+
+    toast.success("Estado actualizado");
 
     const mappingId = await getMapping(task.clienteId ?? "");
     const id = mappingId ?? task._id;
 
-    // si id parece no válido o es clienteId temporal y no hay mapping -> push a queue
     if (!mappingId && (!id || id === "undefined")) {
-      // push update to outbox so server will get it when create is synced
       await queue({
         _id: crypto.randomUUID(),
         op: "update",
@@ -215,16 +209,14 @@ export default function Dashboard() {
       return;
     }
 
-    // si tenemos id (sea mapping o mismo _id), intentamos PUT
     if (navigator.onLine) {
       try {
         await api.put(`/tasks/${id}`, {
           title: updated.title,
-          descrption: updated.descrption,
+          description: updated.description,
           status: updated.status,
         });
       } catch (err) {
-        console.warn("PUT status failed, queueing", err);
         await queue({
           _id: crypto.randomUUID(),
           op: "update",
@@ -244,37 +236,37 @@ export default function Dashboard() {
     }
   }
 
-  async function toggleTask(task: Task) {
-    const newStatus = task.status === "Completada" ? "Pendiente" : "Completada";
-    await changeStatus(task, newStatus);
+  function toggleTask(task: Task) {
+    const newStatus =
+      task.status === "Completada" ? "Pendiente" : "Completada";
+    changeStatus(task, newStatus);
   }
 
-  // edit inline
+  // START EDIT
   function startEdit(task: Task) {
     setEditingId(task._id);
     setEditingTitle(task.title);
-    setEditingDesc(task.descrption ?? "");
+    setEditingDesc(task.description ?? "");
     setEditingStatus(task.status);
-    const el = document.getElementById(`task-${task._id}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // SAVE EDIT
   async function saveEdit(taskId: string) {
-    const newTitle = editingTitle.trim();
-    if (!newTitle) return;
-    const before = tasks.find((t) => t._id === taskId);
-    if (!before) return;
+    const t = tasks.find((x) => x._id === taskId);
+    if (!t) return;
 
     const updated: Task = {
-      ...before,
-      title: newTitle,
-      descrption: editingDesc.trim(),
+      ...t,
+      title: editingTitle.trim(),
+      description: editingDesc.trim(),
       status: editingStatus,
     };
 
-    setTasks((prev) => prev.map((t) => (t._id === taskId ? updated : t)));
+    setTasks((prev) => prev.map((x) => (x._id === taskId ? updated : x)));
     setEditingId(null);
     await putTaskLocal(updated);
+
+    toast.success("Cambios guardados");
 
     const mappingId = await getMapping(updated.clienteId ?? "");
     const id = mappingId ?? updated._id;
@@ -294,11 +286,10 @@ export default function Dashboard() {
       try {
         await api.put(`/tasks/${id}`, {
           title: updated.title,
-          descrption: updated.descrption,
+          description: updated.description,
           status: updated.status,
         });
       } catch (err) {
-        console.warn("PUT edit failed, queueing", err);
         await queue({
           _id: crypto.randomUUID(),
           op: "update",
@@ -322,11 +313,13 @@ export default function Dashboard() {
     setEditingId(null);
   }
 
-  // remove
+  // REMOVE TASK
   async function removeTask(taskId: string) {
     const task = tasks.find((t) => t._id === taskId);
-    setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    setTasks((prev) => prev.filter((x) => x._id !== taskId));
     await removeTaskLocal(taskId);
+
+    toast.success("Tarea eliminada");
 
     const mappingId = await getMapping(task?.clienteId ?? "");
     const id = mappingId ?? taskId;
@@ -345,7 +338,6 @@ export default function Dashboard() {
       try {
         await api.delete(`/tasks/${id}`);
       } catch (err) {
-        console.warn("DELETE failed, queueing", err);
         await queue({
           _id: crypto.randomUUID(),
           op: "delete",
@@ -375,201 +367,332 @@ export default function Dashboard() {
       const s = search.toLowerCase();
       list = list.filter(
         (t) =>
-          (t.title || "").toLowerCase().includes(s) ||
-          (t.descrption || "").toLowerCase().includes(s)
+          t.title.toLowerCase().includes(s) ||
+          (t.description || "").toLowerCase().includes(s)
       );
     }
-    if (filter === "active") list = list.filter((t) => t.status !== "Completada");
-    if (filter === "completed") list = list.filter((t) => t.status === "Completada");
+    if (filter === "active")
+      list = list.filter((t) => t.status !== "Completada");
+    if (filter === "completed")
+      list = list.filter((t) => t.status === "Completada");
     return list;
   }, [tasks, search, filter]);
 
   const stats = useMemo(() => {
     const total = tasks.length;
     const done = tasks.filter((t) => t.status === "Completada").length;
-    return { total, done, pending: total - done };
+    const pending = tasks.filter((t) => t.status === "Pendiente").length;
+    const progress = tasks.filter((t) => t.status === "En Progreso").length;
+    return { total, done, pending, progress };
   }, [tasks]);
 
-  
+  const getStatusBadgeClass = (status: Task["status"]) => {
+    switch (status) {
+      case "Pendiente": return "status-pending";
+      case "En Progreso": return "status-progress";
+      case "Completada": return "status-completed";
+      default: return "";
+    }
+  };
+
+  const getStatusIcon = (status: Task["status"]) => {
+    switch (status) {
+      case "Pendiente": return <FiClock />;
+      case "En Progreso": return <FiPlay />;
+      case "Completada": return <FiCheck />;
+      default: return null;
+    }
+  };
+
   return (
     <div className="wrap">
-      <header className="topbar" role="banner">
-        <h1>Tareas</h1>
-        <div className="spacer" />
-        <div className="stats">
-          <span>Total: {stats.total}</span>
-          <span>Hechas: {stats.done}</span>
-          <span>Pendientes: {stats.pending}</span>
+      {/* Header */}
+      <header className="topbar">
+        <div className="topbar-container">
+          <div className="topbar-left">
+            <h1>Dashboard de Tareas</h1>
+            <div className="stats">
+              <div className="stat-item">
+                <span className="stat-value">{stats.total}</span>
+                <span className="stat-label">Total</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{stats.pending}</span>
+                <span className="stat-label">Pendientes</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{stats.progress}</span>
+                <span className="stat-label">En Progreso</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{stats.done}</span>
+                <span className="stat-label">Completadas</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="topbar-right">
+            <div className={`connection-status ${isOnline ? 'online' : 'offline'}`}>
+              <div className={`status-dot ${isOnline ? 'online' : 'offline'}`} />
+              <span>{isOnline ? 'En línea' : 'Sin conexión'}</span>
+            </div>
+            <button className="btn btn-danger" onClick={logout}>
+              <FiLogOut size={18} />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
         </div>
-
-        <div className={`estado-conexion ${isOnline ? "online" : "offline"}`}>
-          {isOnline ? "🟢 " : "🔴 "}
-        </div>
-
-       <button className="btn danger" onClick={logout}>
-  <FiLogOut size={18} />
-</button>
       </header>
 
       <main>
-        {/* CREATE SECTION (separada) */}
-        <section className="create-section" style={{ marginTop: 16 }}>
-          <form className="add add-extended" onSubmit={addTask}>
-            <div style={{ display: "flex", gap: 8, alignItems: "stretch", flexWrap: "wrap" }}>
+        {/* Crear nueva tarea */}
+        <section className="create-section">
+          <div className="form-header">
+            <h2><FiPlus /> Nueva Tarea</h2>
+          </div>
+          <form className="create-form" onSubmit={addTask}>
+            <div className="input-group">
               <input
+                className="input-field"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título de la tarea…"
-                aria-label="Título"
-                style={{ minWidth: 180 }}
+                placeholder="Título de la tarea..."
+                required
               />
-              <textarea
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                placeholder="Descripción opcional…"
-                className="add-desc"
-                aria-label="Descripción"
-              />
+            </div>
+            
+            <div className="input-group">
               <select
+                className="input-field select-field"
                 value={statusNew}
                 onChange={(e) => setStatusNew(e.target.value as Task["status"])}
-                className="status-select"
-                aria-label="Estado inicial"
               >
                 <option value="Pendiente">Pendiente</option>
                 <option value="En Progreso">En Progreso</option>
                 <option value="Completada">Completada</option>
               </select>
-
-              <button className="btn" style={{ alignSelf: "center" }}>
-                AGREGAR
-              </button>
             </div>
+            
+            <div className="input-group">
+              <textarea
+                className="input-field textarea-field"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                placeholder="Descripción opcional..."
+                rows={2}
+              />
+            </div>
+            
+            <button className="btn btn-primary" type="submit">
+              <FiPlus />
+              Agregar
+            </button>
           </form>
         </section>
 
-        {/* SEARCH + FILTERS (section separada) */}
-        <section className="controls-section" style={{ marginTop: 14, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div className="search-box" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {/* Controles de búsqueda y filtros */}
+        <section className="controls-section">
+          <div className="search-container">
+            <FiSearch className="search-icon" />
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Buscar tareas..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          
+          <div className="filter-buttons">
             <button
-              title="Buscar"
-              className="btn"
-              onClick={() => setShowSearch((s) => !s)}
+              className={`filter-btn ${filter === "all" ? "active" : ""}`}
+              onClick={() => setFilter("all")}
               type="button"
             >
-              🔍
-            </button>
-            {showSearch && (
-              <input
-                className="search"
-                placeholder="Buscar…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                style={{ minWidth: 220 }}
-              />
-            )}
-          </div>
-
-          <div className="filters-section" style={{ display: "flex", gap: 8 }}>
-            <button className={filter === "all" ? "chip active" : "chip"} onClick={() => setFilter("all")} type="button">
               Todas
             </button>
-            <button className={filter === "active" ? "chip active" : "chip"} onClick={() => setFilter("active")} type="button">
+            <button
+              className={`filter-btn ${filter === "active" ? "active" : ""}`}
+              onClick={() => setFilter("active")}
+              type="button"
+            >
               Activas
             </button>
-            <button className={filter === "completed" ? "chip active" : "chip"} onClick={() => setFilter("completed")} type="button">
-              Hechas
+            <button
+              className={`filter-btn ${filter === "completed" ? "active" : ""}`}
+              onClick={() => setFilter("completed")}
+              type="button"
+            >
+              Completadas
             </button>
           </div>
         </section>
 
-        {/* LIST */}
-        {loading ? (
-          <p>Cargando…</p>
-        ) : filtered.length === 0 ? (
-          <p className="empty">Sin tareas</p>
-        ) : (
-          <section className="tasks-list" style={{ marginTop: 12 }}>
-            <ul className="list" style={{ display: "grid", gap: 12 }}>
-              {filtered.map((t, idx) => {
-                const isEditing = editingId === t._id;
+        {/* Lista de tareas */}
+        <section className="tasks-section">
+          {loading ? (
+            <div className="loading">
+              <div className="spinner"></div>
+              <p>Cargando tareas...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📋</div>
+              <h3>No hay tareas</h3>
+              <p>{search ? "No se encontraron tareas con tu búsqueda" : "Comienza agregando una nueva tarea"}</p>
+            </div>
+          ) : (
+            <div className="task-list">
+              {filtered.map((task, idx) => {
+                const isEditing = editingId === task._id;
+                const syncPending = isSyncPending(task._id);
+                
                 return (
-                  <li
-                    id={`task-${t._id}`}
-                    key={`${t._id || t.title}-${idx}`}
-                    className={`item ${t.status === "Completada" ? "done" : ""} ${isEditing ? "expanded" : ""}`}
-                    style={{ animation: "cardIn 300ms ease" }}
+                  <div
+                    key={task._id}
+                    className={`task-item ${task.status === "Completada" ? "done" : ""}`}
                   >
-                    <div style={{ display: "flex", gap: 12, width: "100%" }}>
-                      <div style={{ width: 42, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                        <div className="task-number" aria-hidden>
-                          {idx + 1}
-                        </div>
-                        <label className="check">
-                          <input type="checkbox" checked={t.status === "Completada"} onChange={() => toggleTask(t)} />
-                        </label>
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        {!isEditing ? (
-                          <>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span className="title" onDoubleClick={() => startEdit(t)} style={{ fontWeight: 600 }}>
-                                  {t.title || "(sin título)"}
-                                </span>
-{/* 🚨 ÍCONO DE NUBE PENDIENTE 🚨 */}
-                                {isSyncPending(t._id) && (
-                                  <span className="sync-pending-icon" title="Pendiente de sincronizar al servidor">
-                                    ☁️
-                                  </span>
-                                )}
-                                {/* ... el resto del código ... */}
-                                <span className="muted created" style={{ marginLeft: 8, fontSize: 12, color: "#9aa" }}>
-                                  {/* optional createdAt display */}
-                                </span>
-                              </div>
-
-                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <select className="task-status" value={t.status} onChange={(e) => changeStatus(t, e.target.value as Task["status"])}>
-                                  <option value="Pendiente">Pendiente</option>
-                                  <option value="En Progreso">En Progreso</option>
-                                  <option value="Completada">Completada</option>
-                                </select>
-
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <button className="action-btn" title="Editar" onClick={() => startEdit(t)}>Editar</button>
-                                  <button className="action-btn" title="Eliminar" onClick={() => removeTask(t._id)}>Borrar</button>
+                    <div className="task-header">
+                      <div className="task-info">
+                        <div className="task-number">{idx + 1}</div>
+                        <div className="task-content">
+                          {!isEditing ? (
+                            <>
+                              <h3 className="task-title">{task.title}</h3>
+                              {task.description && (
+                                <p className="task-description">{task.description}</p>
+                              )}
+                            </>
+                          ) : (
+                            <div className="edit-panel">
+                              <form className="edit-form" onSubmit={(e) => {
+                                e.preventDefault();
+                                saveEdit(task._id);
+                              }}>
+                                <div className="input-group">
+                                  <input
+                                    className="input-field"
+                                    value={editingTitle}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    placeholder="Título"
+                                    required
+                                  />
                                 </div>
-                              </div>
+                                
+                                <div className="input-group">
+                                  <textarea
+                                    className="input-field textarea-field"
+                                    value={editingDesc}
+                                    onChange={(e) => setEditingDesc(e.target.value)}
+                                    placeholder="Descripción"
+                                    rows={3}
+                                  />
+                                </div>
+                                
+                                <div className="input-group">
+                                  <select
+                                    className="input-field select-field"
+                                    value={editingStatus}
+                                    onChange={(e) => setEditingStatus(e.target.value as Task["status"])}
+                                  >
+                                    <option value="Pendiente">Pendiente</option>
+                                    <option value="En Progreso">En Progreso</option>
+                                    <option value="Completada">Completada</option>
+                                  </select>
+                                </div>
+                                
+                                <div className="edit-actions">
+                                  <button className="btn btn-secondary" type="button" onClick={cancelEdit}>
+                                    <FiX /> Cancelar
+                                  </button>
+                                  <button className="btn btn-primary" type="submit">
+                                    <FiSave /> Guardar
+                                  </button>
+                                </div>
+                              </form>
                             </div>
-
-                            {t.descrption ? <p className="task-desc" style={{ marginTop: 8 }}>{t.descrption}</p> : null}
-                          </>
-                        ) : (
-                          <div className="edit-panel" style={{ marginTop: 6 }}>
-                            <input className="edit" value={editingTitle} onChange={(e) => setEditingTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveEdit(t._id)} autoFocus />
-                            <textarea className="edit-desc" value={editingDesc} onChange={(e) => setEditingDesc(e.target.value)} placeholder="Descripción..." />
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-                              <select className="task-status" value={editingStatus} onChange={(e) => setEditingStatus(e.target.value as Task["status"])}>
-                                <option value="Pendiente">Pendiente</option>
-                                <option value="En Progreso">En Progreso</option>
-                                <option value="Completada">Completada</option>
-                              </select>
-                              <button className="btn" onClick={() => saveEdit(t._id)} type="button">Guardar</button>
-                              <button className="btn danger" onClick={() => cancelEdit()} type="button">Cancelar</button>
-                            </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
+                      
+                      {!isEditing && (
+                        <div className="task-actions">
+                          <div className={`task-status-badge ${getStatusBadgeClass(task.status)}`}>
+                            {getStatusIcon(task.status)}
+                            <span>{task.status}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </li>
+                    
+                    {!isEditing && (
+                      <div className="task-footer">
+                        <div className="task-meta">
+                          {task.createdAt && (
+                            <div className="task-date">
+                              <FiClock size={14} />
+                              <span>{formatDate(task.createdAt)}</span>
+                            </div>
+                          )}
+                          {syncPending && (
+                            <div className="sync-indicator">
+                              <FiCloud />
+                              <span>Pendiente sincronizar</span>
+                            </div>
+                          )}
+                          {!isOnline && !syncPending && (
+                            <div className="sync-indicator">
+                              <FiCloudOff />
+                              <span>Modo offline</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="task-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => changeStatus(task, "Pendiente")}
+                            type="button"
+                          >
+                            <FiClock /> Pendiente
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => changeStatus(task, "En Progreso")}
+                            type="button"
+                          >
+                            <FiPlay /> En Progreso
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => changeStatus(task, "Completada")}
+                            type="button"
+                          >
+                            <FiCheck /> Completada
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => startEdit(task)}
+                            type="button"
+                          >
+                            <FiEdit2 /> Editar
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => removeTask(task._id)}
+                            type="button"
+                          >
+                            <FiTrash2 /> Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </ul>
-          </section>
-        )}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

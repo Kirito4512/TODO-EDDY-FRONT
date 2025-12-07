@@ -14,7 +14,7 @@ function normalizeTask(x: any) {
     return {
         _id: String(x?._id ?? x?.id),
         title: String(x?.title ?? "(sin título)"),
-        descrption: x?.descrption ?? "",
+        description: x?.description ?? "",
         status: x?.status === "Completada" || x?.status === "En Progreso" || x?.status === "Pendiente" ? x.status : "Pendiente",
     };
 }
