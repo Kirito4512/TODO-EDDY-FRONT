@@ -1,4 +1,4 @@
-// src/offline/sync.ts
+// src/offline/sync.t
 
 import { api } from "../api";
 import {
